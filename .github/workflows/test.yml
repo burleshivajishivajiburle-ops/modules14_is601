@@ -2,9 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   test:
@@ -24,9 +24,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           
@@ -40,21 +40,24 @@ jobs:
       - name: Install dependencies
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install  # if you use Playwright for e2e tests
+          playwright install --with-deps chromium
       
       - name: Run tests
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           source venv/bin/activate
+          mkdir -p test-results
           
           # 1) Unit tests
-          pytest tests/unit/ --cov=src --junitxml=test-results/junit.xml
+          pytest tests/unit/ --cov=app --cov-report=xml --cov-report=term --junitxml=test-results/junit.xml
           
           # 2) Integration tests
           pytest tests/integration/
@@ -82,7 +85,7 @@ jobs:
   
   deploy:
     needs: security
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production
     steps:
