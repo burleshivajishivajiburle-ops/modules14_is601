@@ -1,0 +1,392 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100">
+    <!-- Navigation -->
+    <nav class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <h1 class="text-xl font-bold text-gray-800">Calculations Dashboard</h1>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <span id="userWelcome" class="text-gray-700 mr-4"></span>
+                    <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Error/Success Alerts -->
+        <div id="errorAlert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+            <span id="errorMessage" class="block sm:inline"></span>
+        </div>
+        <div id="successAlert" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
+            <span id="successMessage" class="block sm:inline"></span>
+        </div>
+
+        <!-- New Calculation Form -->
+        <div class="bg-white shadow rounded-lg mb-6 p-4">
+            <h2 class="text-lg font-semibold mb-4">New Calculation</h2>
+            <form id="calculationForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Type</label>
+                        <select id="calcType" name="type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="addition">Addition</option>
+                            <option value="subtraction">Subtraction</option>
+                            <option value="multiplication">Multiplication</option>
+                            <option value="division">Division</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Numbers (comma-separated)</label>
+                        <input type="text" id="calcInputs" name="inputs" placeholder="e.g. 5,10,15" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                </div>
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                    Calculate
+                </button>
+            </form>
+        </div>
+
+        <!-- Edit Modal -->
+        <div id="editModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Calculation</h3>
+                    <form id="editCalculationForm" class="space-y-4">
+                        <input type="hidden" id="editCalcId">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Type</label>
+                            <select id="editCalcType" name="type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="addition">Addition</option>
+                                <option value="subtraction">Subtraction</option>
+                                <option value="multiplication">Multiplication</option>
+                                <option value="division">Division</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Numbers (comma-separated)</label>
+                            <input type="text" id="editCalcInputs" name="inputs" placeholder="e.g. 5,10,15" 
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div class="flex justify-end space-x-2">
+                            <button type="button" id="cancelEdit" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                                Cancel
+                            </button>
+                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                                Update
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calculations History -->
+        <div class="bg-white shadow rounded-lg p-4">
+            <h2 class="text-lg font-semibold mb-4">Calculation History</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inputs</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Result</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calculationsTable" class="bg-white divide-y divide-gray-200">
+                        <!-- Calculations will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is logged in
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    // Set welcome message
+    const username = localStorage.getItem('username');
+    document.getElementById('userWelcome').textContent = `Welcome, ${username}!`;
+
+    // Helper functions for alerts
+    function showError(message) {
+        const errorAlert = document.getElementById('errorAlert');
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.textContent = message;
+        errorAlert.classList.remove('hidden');
+        setTimeout(() => errorAlert.classList.add('hidden'), 5000);
+    }
+
+    function showSuccess(message) {
+        const successAlert = document.getElementById('successAlert');
+        const successMessage = document.getElementById('successMessage');
+        successMessage.textContent = message;
+        successAlert.classList.remove('hidden');
+        setTimeout(() => successAlert.classList.add('hidden'), 5000);
+    }
+
+    // Client-side validation function
+    function validateInputs(inputs, type) {
+        const errors = [];
+        
+        if (!Array.isArray(inputs) || inputs.length < 2) {
+            errors.push('Please enter at least two valid numbers');
+        }
+        
+        if (inputs.some(num => isNaN(num))) {
+            errors.push('All inputs must be valid numbers');
+        }
+        
+        if (type === 'division' && inputs.slice(1).some(num => num === 0)) {
+            errors.push('Cannot divide by zero');
+        }
+        
+        return errors;
+    }
+
+    // Load calculations
+    async function loadCalculations() {
+        try {
+            const response = await fetch('/calculations', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Token expired or invalid
+                    localStorage.clear();
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error('Failed to load calculations');
+            }
+
+            const calculations = await response.json();
+            const tableBody = document.getElementById('calculationsTable');
+            tableBody.innerHTML = '';
+
+            if (calculations.length === 0) {
+                // Show a message when no calculations exist
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                        No calculations found. Create your first calculation above!
+                    </td>
+                `;
+                tableBody.appendChild(row);
+                return;
+            }
+
+            calculations.forEach(calc => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">${calc.type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${calc.inputs.join(', ')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${calc.result}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${new Date(calc.created_at).toLocaleDateString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                        <button class="text-blue-600 hover:text-blue-900 edit-calc" data-id="${calc.id}" data-type="${calc.type}" data-inputs="${calc.inputs.join(',')}">Edit</button>
+                        <button class="text-red-600 hover:text-red-900 delete-calc" data-id="${calc.id}">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // Add edit event listeners
+            document.querySelectorAll('.edit-calc').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const calcId = e.target.dataset.id;
+                    const calcType = e.target.dataset.type;
+                    const calcInputs = e.target.dataset.inputs;
+                    
+                    document.getElementById('editCalcId').value = calcId;
+                    document.getElementById('editCalcType').value = calcType;
+                    document.getElementById('editCalcInputs').value = calcInputs;
+                    document.getElementById('editModal').classList.remove('hidden');
+                });
+            });
+
+            // Add delete event listeners
+            document.querySelectorAll('.delete-calc').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    if (!confirm('Are you sure you want to delete this calculation?')) {
+                        return;
+                    }
+                    
+                    const calcId = e.target.dataset.id;
+                    try {
+                        const response = await fetch(`/calculations/${calcId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        if (!response.ok) {
+                            if (response.status === 401) {
+                                localStorage.clear();
+                                window.location.href = '/login';
+                                return;
+                            }
+                            throw new Error('Failed to delete calculation');
+                        }
+
+                        showSuccess('Calculation deleted successfully');
+                        loadCalculations();
+                    } catch (error) {
+                        showError('Error deleting calculation');
+                    }
+                });
+            });
+        } catch (error) {
+            showError('Error loading calculations');
+        }
+    }
+
+    // Handle edit form submission
+    document.getElementById('editCalculationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const calcId = document.getElementById('editCalcId').value;
+        const calcType = document.getElementById('editCalcType').value;
+        const inputs = document.getElementById('editCalcInputs').value
+            .split(',')
+            .map(num => parseFloat(num.trim()))
+            .filter(num => !isNaN(num));
+
+        const validationErrors = validateInputs(inputs, calcType);
+        if (validationErrors.length > 0) {
+            showError(validationErrors.join('. '));
+            return;
+        }
+
+        const updateData = {
+            inputs: inputs
+        };
+
+        try {
+            const response = await fetch(`/calculations/${calcId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    localStorage.clear();
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error('Failed to update calculation');
+            }
+
+            showSuccess('Calculation updated successfully');
+            document.getElementById('editModal').classList.add('hidden');
+            loadCalculations();
+        } catch (error) {
+            showError('Error updating calculation');
+        }
+    });
+
+    // Modal controls
+    document.getElementById('cancelEdit').addEventListener('click', () => {
+        document.getElementById('editModal').classList.add('hidden');
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('editModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('editModal')) {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+    });
+
+    // Handle new calculation submission
+    document.getElementById('calculationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const calcType = document.getElementById('calcType').value;
+        const inputs = document.getElementById('calcInputs').value
+            .split(',')
+            .map(num => parseFloat(num.trim()))
+            .filter(num => !isNaN(num));
+
+        const validationErrors = validateInputs(inputs, calcType);
+        if (validationErrors.length > 0) {
+            showError(validationErrors.join('. '));
+            return;
+        }
+
+        const calculationData = {
+            type: calcType,
+            inputs: inputs
+        };
+
+        try {
+            const response = await fetch('/calculations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(calculationData)
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    localStorage.clear();
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error('Failed to create calculation');
+            }
+
+            showSuccess('Calculation created successfully');
+            document.getElementById('calculationForm').reset();
+            loadCalculations();
+        } catch (error) {
+            showError('Error creating calculation');
+        }
+    });
+
+    // Handle logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+    });
+
+    // Initial load of calculations
+    loadCalculations();
+
+    // Refresh calculations periodically (every 30 seconds)
+    setInterval(loadCalculations, 30000);
+});
+</script>
+{% endblock %}
